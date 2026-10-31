@@ -34,12 +34,22 @@
         "tag": "dns-proxy",
         "server": "1.1.1.1",
         "detour": "Proxy"
+      },
+      {
+        "type": "https",
+        "tag": "dns-anthropic",
+        "server": "1.1.1.1",
+        "detour": "Anthropic"
       }
     ],
     "rules": [
       {
+        "rule_set": "anthropic",
+        "action": "route",
+        "server": "dns-anthropic"
+      },
+      {
         "rule_set": [
-          "anthropic",
           "OpenAI",
           "Telegram",
           "YouTube",
@@ -119,11 +129,9 @@
       "type": "selector",
       "tag": "Anthropic",
       "outbounds": [
-        "Proxy",
-        "Auto",
-        "{all}"
+        "🇺🇸 USA Los Angeles 01 [DIP USA-Los Angeles]"
       ],
-      "default": "Proxy"
+      "default": "🇺🇸 USA Los Angeles 01 [DIP USA-Los Angeles]"
     },
     {
       "type": "selector",

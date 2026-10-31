@@ -34,6 +34,19 @@ class NodeSelectionTests(unittest.TestCase):
             if outbound['tag'] in ['Proxy', 'Auto', 'Anthropic', 'OpenAI']:
                 self.assertTrue(set(outbound['outbounds']).issubset(set(names) | {'Proxy', 'Auto'}))
 
+    def test_anthropic_is_pinned_with_matching_dns_detour(self):
+        target = '🇺🇸 USA Los Angeles 01 [DIP USA-Los Angeles]'
+        result = main.combin_to_config(copy.deepcopy(self.template),
+                                      {'a': [node(target), node('🇭🇰 Hong Kong 01')]})
+        group = next(o for o in result['outbounds'] if o['tag'] == 'Anthropic')
+        self.assertEqual(group['outbounds'], [target])
+        self.assertEqual(group['default'], target)
+        rule = next(r for r in result['route']['rules'] if r.get('rule_set') == 'anthropic')
+        self.assertEqual(rule['outbound'], 'Anthropic')
+        self.assertEqual(result['dns']['rules'][0]['server'], 'dns-anthropic')
+        dns = next(s for s in result['dns']['servers'] if s['tag'] == 'dns-anthropic')
+        self.assertEqual(dns['detour'], 'Anthropic')
+
     def test_empty_match_fails_instead_of_generating_direct_only_config(self):
         with self.assertRaises(ValueError):
             main.combin_to_config(copy.deepcopy(self.template), {'a': [node('Japan 01')]})
