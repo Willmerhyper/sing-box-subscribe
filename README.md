@@ -145,5 +145,5 @@ https://singbox.hyperchem.top/config/<URL编码后的订阅源>&file=<URL编码�
 ### 自用模板节点精简
 
 `hyperchem-1.14.json` 的 `_node_selection` 是转换器指令，生成配置时会删除，不传给 sing-box。
-按订阅中的原始顺序保留前 2 个 Hong Kong、前 2 个 Japan、USA Seattle 01 和全部 USA Los Angeles。
+按订阅中的原始顺序保留前 2 个 Hong Kong、前 2 个 Singapore、USA Seattle 01 和全部 USA Los Angeles。
 该筛选在分组展开之前执行，未选中的节点也不会进入最终 `outbounds`；不限洛杉矶节点数量，以便订阅新增同城节点时自动纳入。

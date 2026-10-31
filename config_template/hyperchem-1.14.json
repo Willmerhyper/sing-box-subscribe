@@ -310,7 +310,7 @@
       "limit": 2
     },
     {
-      "pattern": "(?:^|\\s)Japan\\s",
+      "pattern": "(?:^|\\s)Singapore\\s",
       "limit": 2
     },
     {
