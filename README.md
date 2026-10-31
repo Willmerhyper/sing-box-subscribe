@@ -140,3 +140,10 @@ https://singbox.hyperchem.top/config/<URL编码后的订阅源>&file=<URL编码�
 - 使用 1.14 的显式 HTTP client 下载规则；未使用旧 DNS server 格式、旧 DNS/block 出站或旧入站 sniff 字段。
 - 模板只包含公共规则与分组；不要把私人订阅、节点密码或最终含节点的配置提交到仓库。
 - 将转换后的链接作为 macOS 官方客户端远程配置导入；下载 JSON 仅为静态快照。规则集每 1 天更新，节点更新由客户端的远程配置更新触发。
+
+
+### 自用模板节点精简
+
+`hyperchem-1.14.json` 的 `_node_selection` 是转换器指令，生成配置时会删除，不传给 sing-box。
+按订阅中的原始顺序保留前 2 个 Hong Kong、前 2 个 Japan、USA Seattle 01 和全部 USA Los Angeles。
+该筛选在分组展开之前执行，未选中的节点也不会进入最终 `outbounds`；不限洛杉矶节点数量，以便订阅新增同城节点时自动纳入。

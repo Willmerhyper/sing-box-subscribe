@@ -303,5 +303,21 @@
       }
     ],
     "final": "Proxy"
-  }
+  },
+  "_node_selection": [
+    {
+      "pattern": "(?:^|\\s)Hong Kong\\s",
+      "limit": 2
+    },
+    {
+      "pattern": "(?:^|\\s)Japan\\s",
+      "limit": 2
+    },
+    {
+      "pattern": "(?:^|\\s)USA Seattle 01(?:\\s|$)"
+    },
+    {
+      "pattern": "(?:^|\\s)USA Los Angeles\\s"
+    }
+  ]
 }
