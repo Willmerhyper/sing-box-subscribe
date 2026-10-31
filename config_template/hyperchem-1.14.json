@@ -1,0 +1,307 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true
+    }
+  },
+  "http_clients": [
+    {
+      "tag": "rule-download",
+      "detour": "Proxy"
+    }
+  ],
+  "dns": {
+    "servers": [
+      {
+        "type": "udp",
+        "tag": "bootstrap",
+        "server": "223.5.5.5",
+        "detour": "Direct"
+      },
+      {
+        "type": "https",
+        "tag": "dns-direct",
+        "server": "dns.alidns.com",
+        "domain_resolver": "bootstrap",
+        "detour": "Direct"
+      },
+      {
+        "type": "https",
+        "tag": "dns-proxy",
+        "server": "1.1.1.1",
+        "detour": "Proxy"
+      }
+    ],
+    "rules": [
+      {
+        "rule_set": [
+          "anthropic",
+          "OpenAI",
+          "Telegram",
+          "YouTube",
+          "Twitter",
+          "Facebook",
+          "Netflix",
+          "TikTok",
+          "Microsoft",
+          "AppleMusic"
+        ],
+        "action": "route",
+        "server": "dns-proxy"
+      },
+      {
+        "rule_set": [
+          "cn",
+          "Bilibili",
+          "WeChat"
+        ],
+        "action": "route",
+        "server": "dns-direct"
+      }
+    ],
+    "final": "dns-proxy",
+    "strategy": "prefer_ipv4"
+  },
+  "inbounds": [
+    {
+      "type": "tun",
+      "tag": "tun-in",
+      "address": [
+        "172.19.0.1/30"
+      ],
+      "auto_route": true,
+      "strict_route": true,
+      "stack": "system",
+      "platform": {
+        "http_proxy": {
+          "enabled": true,
+          "server": "127.0.0.1",
+          "server_port": 7890
+        }
+      }
+    },
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 7890
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "Direct"
+    },
+    {
+      "type": "selector",
+      "tag": "Proxy",
+      "outbounds": [
+        "Auto",
+        "{all}"
+      ],
+      "default": "Auto"
+    },
+    {
+      "type": "urltest",
+      "tag": "Auto",
+      "outbounds": [
+        "{all}"
+      ],
+      "url": "https://www.gstatic.com/generate_204",
+      "interval": "10m",
+      "tolerance": 50
+    },
+    {
+      "type": "selector",
+      "tag": "Anthropic",
+      "outbounds": [
+        "Proxy",
+        "Auto",
+        "{all}"
+      ],
+      "default": "Proxy"
+    },
+    {
+      "type": "selector",
+      "tag": "OpenAI",
+      "outbounds": [
+        "Proxy",
+        "Auto",
+        "{all}"
+      ],
+      "default": "Proxy"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "default_domain_resolver": "bootstrap",
+    "default_http_client": "rule-download",
+    "rules": [
+      {
+        "action": "sniff"
+      },
+      {
+        "type": "logical",
+        "mode": "or",
+        "rules": [
+          {
+            "port": 53
+          },
+          {
+            "protocol": "dns"
+          }
+        ],
+        "action": "hijack-dns"
+      },
+      {
+        "ip_is_private": true,
+        "action": "route",
+        "outbound": "Direct"
+      },
+      {
+        "rule_set": "anthropic",
+        "action": "route",
+        "outbound": "Anthropic"
+      },
+      {
+        "rule_set": "OpenAI",
+        "action": "route",
+        "outbound": "OpenAI"
+      },
+      {
+        "rule_set": [
+          "Telegram",
+          "YouTube",
+          "Twitter",
+          "Facebook",
+          "Netflix",
+          "TikTok",
+          "Microsoft",
+          "AppleMusic"
+        ],
+        "action": "route",
+        "outbound": "Proxy"
+      },
+      {
+        "rule_set": [
+          "cn",
+          "Bilibili",
+          "WeChat"
+        ],
+        "action": "route",
+        "outbound": "Direct"
+      }
+    ],
+    "rule_set": [
+      {
+        "type": "remote",
+        "tag": "anthropic",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/anthropic.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "OpenAI",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/OpenAI.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "Telegram",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/Telegram.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "YouTube",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/YouTube.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "Twitter",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/Twitter.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "Facebook",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/Facebook.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "Netflix",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/Netflix.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "TikTok",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/TikTok.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "Microsoft",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/Microsoft.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "AppleMusic",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/AppleMusic.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "Bilibili",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/Bilibili.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "WeChat",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/Willmerhyper/sing-box-geosite/main/rule/WeChat.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      },
+      {
+        "type": "remote",
+        "tag": "cn",
+        "format": "binary",
+        "url": "https://raw.githubusercontent.com/MetaCubeX/meta-rules-dat/sing/geo/geosite/cn.srs",
+        "http_client": "rule-download",
+        "update_interval": "1d"
+      }
+    ],
+    "final": "Proxy"
+  }
+}
