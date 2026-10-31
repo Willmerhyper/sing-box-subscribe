@@ -127,8 +127,10 @@ docker run -p 5000:5000 sing-box:latest
 通过自己的 Vercel 转换器使用远程模板，客户端每次更新配置时会重新读取订阅并合并最新模板：
 
 ```text
-https://singbox.hyperchem.top/config/<URL编码后的订阅源>&file=https://raw.githubusercontent.com/Willmerhyper/sing-box-subscribe/main/config_template/hyperchem-1.14.json&ua=Shadowrocket
+https://singbox.hyperchem.top/config/<URL编码后的订阅源>&file=<URL编码后的模板链接>&ua=Shadowrocket
 ```
+
+模板链接为 `https://raw.githubusercontent.com/Willmerhyper/sing-box-subscribe/main/config_template/hyperchem-1.14.json`。订阅源与模板链接均用 `encodeURIComponent` / `urllib.parse.quote(value, safe="")` 编码，避免 Vercel 对路径中的双斜线重定向。
 
 - TUN + 本机 `127.0.0.1:7890` mixed 入站，提供 macOS 系统 HTTP 代理。
 - `Proxy` 手动选节点，默认 `Auto` 自动测速；`Anthropic` 与 `OpenAI` 有独立选择分组。
