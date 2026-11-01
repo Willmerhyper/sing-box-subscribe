@@ -423,37 +423,7 @@ def pro_node_template(data_nodes, config_outbound, group):
     return [node.get('tag') for node in data_nodes]
 
 
-def select_template_nodes(data, selection):
-    """Apply template-only node selection before expanding any outbound groups."""
-    compiled = []
-    for rule in selection:
-        limit = rule.get('limit')
-        if limit is not None and (type(limit) is not int or limit < 1):
-            raise ValueError('Node selection limit must be a positive integer')
-        compiled.append((re.compile(rule['pattern']), limit))
-    counts = [0] * len(compiled)
-    selected = {}
-    for group, nodes in data.items():
-        kept = []
-        for node in nodes:
-            matches = [i for i, (pattern, limit) in enumerate(compiled)
-                       if pattern.search(node['tag']) and
-                       (limit is None or counts[i] < limit)]
-            if matches:
-                kept.append(node)
-                for i in matches:
-                    counts[i] += 1
-        if kept:
-            selected[group] = kept
-    if not selected:
-        raise ValueError('No subscription nodes match the template selection')
-    return selected
-
-
 def combin_to_config(config, data):
-    selection = config.pop('_node_selection', None)
-    if selection is not None:
-        data = select_template_nodes(data, selection)
     config_outbounds = config["outbounds"] if config.get("outbounds") else None
     i = 0
     for group in data:

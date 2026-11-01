@@ -118,34 +118,3 @@ docker run -p 5000:5000 sing-box:latest
 }
 ```
 
-
-
-## Hyperchem — macOS 官方 sing-box 1.14
-
-自用模板：`config_template/hyperchem-1.14.json`。
-
-通过自己的 Vercel 转换器使用远程模板，客户端每次更新配置时会重新读取订阅并合并最新模板：
-
-```text
-https://singbox.hyperchem.top/config/<URL编码后的订阅源>&file=<URL编码后的模板链接>&ua=Shadowrocket
-```
-
-模板链接为 `https://raw.githubusercontent.com/Willmerhyper/sing-box-subscribe/main/config_template/hyperchem-1.14.json`。订阅源与模板链接均用 `encodeURIComponent` / `urllib.parse.quote(value, safe="")` 编码，避免 Vercel 对路径中的双斜线重定向。
-
-- TUN + 本机 `127.0.0.1:7890` mixed 入站，提供 macOS 系统 HTTP 代理。
-- `Proxy` 手动选节点，默认 `Auto` 自动测速；`Anthropic` 固定使用 `🇺🇸 USA Los Angeles 01 [DIP USA-Los Angeles]`，`OpenAI` 有独立选择分组。
-- Anthropic、OpenAI、Telegram、YouTube、Twitter、Facebook、Netflix、TikTok、Microsoft、AppleMusic、Bilibili 和 WeChat 使用自己的 `Willmerhyper/sing-box-geosite` 仓库规则。
-- 国内域名基础分流补充使用 MetaCubeX `cn.srs`；国内和局域网直连，其他流量默认代理。
-- 分类型 DNS，国内使用直连 DoH，海外使用经代理的 DoH；节点域名通过独立 bootstrap DNS 解析，避免解析循环。
-- 使用 1.14 的显式 HTTP client 下载规则；未使用旧 DNS server 格式、旧 DNS/block 出站或旧入站 sniff 字段。
-- 模板只包含公共规则与分组；不要把私人订阅、节点密码或最终含节点的配置提交到仓库。
-- 将转换后的链接作为 macOS 官方客户端远程配置导入；下载 JSON 仅为静态快照。规则集每 1 天更新，节点更新由客户端的远程配置更新触发。
-
-
-### 自用模板节点精简
-
-`hyperchem-1.14.json` 的 `_node_selection` 是转换器指令，生成配置时会删除，不传给 sing-box。
-按订阅中的原始顺序保留前 2 个 Hong Kong、前 2 个 Singapore、USA Seattle 01 和全部 USA Los Angeles。
-该筛选在分组展开之前执行，未选中的节点也不会进入最终 `outbounds`；不限洛杉矶节点数量，以便订阅新增同城节点时自动纳入。
-
-Anthropic 分组仅包含上述洛杉矶专用节点，不回退到 Auto/Proxy；Anthropic DNS 的 DoH 请求也经同一分组发送。
