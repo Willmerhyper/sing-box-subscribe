@@ -9,6 +9,12 @@ import shutil
 import tempfile  # 导入 tempfile 模块
 from datetime import datetime, timedelta
 
+# Vercel loads this file as api/app.py; keep the repo root importable.
+_REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _REPO_ROOT not in sys.path:
+    sys.path.insert(0, _REPO_ROOT)
+from template_order import list_templates, default_template_index
+
 app = Flask(__name__, template_folder='../templates')  # 指定模板文件夹的路径
 app.secret_key = 'sing-box'  # 替换为实际的密钥
 data_json = {}
@@ -39,12 +45,8 @@ def get_temp_json_data():
 
 # 获取config_template目录下的模板文件列表
 def get_template_list():
-    template_list = []
-    config_template_dir = 'config_template'  # 配置模板文件夹路径
-    template_files = os.listdir(config_template_dir)  # 获取文件夹中的所有文件
-    template_list = [os.path.splitext(file)[0] for file in template_files if file.endswith('.json')]  # 移除扩展名并过滤出以.json结尾的文件
-    template_list.sort()  # 对文件名进行排序
-    return template_list
+    # Same pinned order as main.py / file=N. See template_order.py.
+    return list_templates('config_template')
 
 # 读取providers.json文件的内容，如果有临时 JSON 数据则使用它
 def read_providers_json():
@@ -251,7 +253,8 @@ def config(url):
     #page_content = f"生成的页面内容：{full_url}"
     #return page_content
     try:
-        selected_template_index = '0'
+        # No numeric file=: config_1.14, not the historical file=1 template.
+        selected_template_index = str(default_template_index())
         selected_gh_proxy_index = ''
         if file_param.isdigit():
             temp_json_data['config_template'] = ''

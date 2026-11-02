@@ -44,6 +44,19 @@ Example: https://sing-box-subscribe.vercel.app/config/https%3A%2F%2Fgist.githubu
 
 Example: https://sing-box-subscribe.vercel.app/config/https://gist.githubusercontent.com/Toperlock/b1ca381c32820e8c79669cbbd85b68ac/raw/dafae92fbe48ff36dae6e5172caa1cfd7914cda4/gistfile1.txt&file=2
 
+`file=N` is a fixed list, not a fresh filename sort. Adding a template does not renumber the links below. Omitting `file=` selects `config_1.14` (a sing-box 1.14 template) instead of `file=1`.
+
+| file= | template |
+| --- | --- |
+| 1 | `config_template_groups_rule_set_tun` |
+| 2 | `config_template_groups_rule_set_tun_fakeip` |
+| 3 | `config_template_no_groups_tun_VN` |
+| 4 | `sb-config-1.12` |
+| 5 | `sb-config-1.14` |
+| 6 | `config_1.14` |
+
+Templates `file=1` through `file=4` were migrated to the sing-box 1.14 DNS server format. They no longer use a legacy `"address": "tls://..."` server, an `outbound` DNS rule, rule-set `download_detour`, `independent_cache`, or `store_rdrc`. The IP-only `geoip-cn` DNS rule in `sb-config-1.12` (and the fake-ip template) evaluates the response and matches it with `match_response`.
+
 ### Demo video
 
 |Web parsing subscription link(v2/clash/sing-box)|
@@ -165,7 +178,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-or you can directly select the template with the  `template_index`, `0` means the first template(no flask doesn't support)
+or you can directly select the template with the  `template_index`, `0` means the first pinned template (`file=1`). Pressing Enter with no index selects `config_1.14`, the same template used when `file=` is omitted.
 
 ```
 python main.py --template_index=0
