@@ -1,4 +1,5 @@
 import json, os, tool, time, requests, sys, importlib, argparse, yaml, ruamel.yaml
+import copy
 import re
 from datetime import datetime
 from urllib.parse import urlparse
@@ -6,6 +7,7 @@ from collections import OrderedDict
 from api.app import TEMP_DIR
 from parsers.clash2base64 import clash2v2ray
 from gh_proxy_helper import set_gh_proxy
+from template_order import list_templates, default_template_index
 
 parsers_mod = {}
 providers = None
@@ -28,12 +30,8 @@ def init_parsers():
 
 
 def get_template():
-    template_dir = 'config_template'  # 配置模板文件夹路径
-    template_files = os.listdir(template_dir)  # 获取文件夹中的所有文件
-    template_list = [os.path.splitext(file)[0] for file in template_files if
-                     file.endswith('.json')]  # 移除扩展名并过滤出以.json结尾的文件
-    template_list.sort()  # 对文件名进行排序
-    return template_list
+    # Pinned order: file=1..6 stay on the same templates. See template_order.py.
+    return list_templates('config_template')
 
 
 def load_json(path):
@@ -354,66 +352,166 @@ def save_config(path, nodes):
             # print(f"Lỗi khi lưu lại file cấu hình: {str(e)}")
 
 
+# sing-box 1.12+ DNS server types that dial a network and accept `detour`.
+# fakeip/local/hosts reject `detour` and cannot be cloned per outbound.
+_DNS_TYPES_WITHOUT_DETOUR = {'fakeip', 'local', 'hosts', 'dhcp', 'resolved', 'tailscale'}
+
+
+def _dns_server_list(config):
+    dns = config.get('dns')
+    if not isinstance(dns, dict):
+        return []
+    servers = dns.get('servers')
+    if not isinstance(servers, list):
+        return []
+    return [server for server in servers if isinstance(server, dict)]
+
+
+def _find_dns_server(servers, tag):
+    for server in servers:
+        if server.get('tag') == tag:
+            return server
+    return None
+
+
+def _direct_outbound_tags(config):
+    tags = {'direct'}
+    for outbound in config.get('outbounds') or []:
+        if isinstance(outbound, dict) and outbound.get('type') == 'direct' and isinstance(outbound.get('tag'), str):
+            tags.add(outbound['tag'])
+    return tags
+
+
+def _clone_detour_dns_server(template, tag, detour):
+    """Copy a DNS server and point it at an outbound.
+
+    Legacy servers use `address` (for example `tls://1.1.1.1`). sing-box 1.12+
+    servers use `type` plus `server` and have no `address` field. Both shapes
+    are copied; only the tag and detour are replaced.
+    """
+    if not isinstance(template, dict):
+        return None
+    server_type = template.get('type')
+    if server_type in _DNS_TYPES_WITHOUT_DETOUR:
+        return None
+    if server_type is None and 'address' not in template and 'server' not in template:
+        return None
+    dns_obj = copy.deepcopy(template)
+    dns_obj['tag'] = tag
+    dns_obj['detour'] = detour
+    return dns_obj
+
+
 def set_proxy_rule_dns(config):
-    # dns_template = {
-    #     "tag": "remote",
-    #     "address": "tls://1.1.1.1",
-    #     "detour": ""
-    # }
-    config_rules = config['route']['rules']
+    """Mirror route rules into DNS rules. Skip instead of raising on 1.14 templates."""
+    try:
+        applied = _set_proxy_rule_dns(config)
+    except Exception as exc:
+        print('自动设置出站 DNS 已跳过：{}'.format(exc))
+        return False
+    return applied
+
+
+def _set_proxy_rule_dns(config):
+    route = config.get('route') if isinstance(config.get('route'), dict) else {}
+    config_rules = route.get('rules')
+    dns = config.get('dns') if isinstance(config.get('dns'), dict) else None
+    if not isinstance(config_rules, list) or dns is None or not isinstance(dns.get('rules'), list):
+        print('自动设置出站 DNS 已跳过：模板里没有可用的 route.rules 或 dns.rules')
+        return False
+    if not isinstance(dns.get('servers'), list):
+        print('自动设置出站 DNS 已跳过：模板里没有 dns.servers')
+        return False
+    asod = providers.get("auto_set_outbounds_dns") if isinstance(providers, dict) else None
+    if not isinstance(asod, dict) or not asod.get('proxy') or not asod.get('direct'):
+        return False
+    servers = _dns_server_list(config)
+    proxy_server = _find_dns_server(servers, asod['proxy'])
+    direct_server = _find_dns_server(servers, asod['direct'])
+    if proxy_server is None or direct_server is None:
+        print('自动设置出站 DNS 已跳过：dns server tag 不存在')
+        return False
+    if proxy_server.get('type') in _DNS_TYPES_WITHOUT_DETOUR:
+        print('自动设置出站 DNS 已跳过：{} 类型的 DNS 服务器不能设置 detour'.format(proxy_server.get('type')))
+        return False
+    direct_outbounds = _direct_outbound_tags(config)
+    uses_actions = any(isinstance(rule, dict) and 'action' in rule for rule in dns['rules'])
     outbound_dns = []
-    dns_rules = config['dns']['rules']
-    asod = providers["auto_set_outbounds_dns"]
+    dns_rules = list(dns['rules'])
     for rule in config_rules:
-        if rule['outbound'] not in ['block', 'dns-out']:
-            if rule['outbound'] != 'direct':
-                outbounds_dns_template = \
-                    list(filter(lambda server: server['tag'] == asod["proxy"], config['dns']['servers']))[0]
-                dns_obj = outbounds_dns_template.copy()
-                dns_obj['tag'] = rule['outbound'] + '_dns'
-                dns_obj['detour'] = rule['outbound']
-                if dns_obj not in outbound_dns:
-                    outbound_dns.append(dns_obj)
-            if rule.get('type') and rule['type'] == 'logical':
-                dns_rule_obj = {
-                    'type': 'logical',
-                    'mode': rule['mode'],
-                    'rules': [],
-                    'server': rule['outbound'] + '_dns' if rule['outbound'] != 'direct' else asod["direct"]
-                }
-                for _rule in rule['rules']:
-                    child_rule = pro_dns_from_route_rules(_rule)
-                    if child_rule:
-                        dns_rule_obj['rules'].append(child_rule)
-                if len(dns_rule_obj['rules']) == 0:
-                    dns_rule_obj = None
-            else:
-                dns_rule_obj = pro_dns_from_route_rules(rule)
-            if dns_rule_obj:
-                dns_rules.append(dns_rule_obj)
-    # 清除重复规则
+        if not isinstance(rule, dict):
+            continue
+        outbound = rule.get('outbound')
+        if not isinstance(outbound, str) or outbound in ('block', 'dns-out'):
+            # 1.14 rules often use action (sniff/hijack-dns/reject) and have no outbound.
+            continue
+        is_direct = outbound in direct_outbounds
+        server_tag = asod['direct'] if is_direct else outbound + '_dns'
+        if not is_direct:
+            dns_obj = _clone_detour_dns_server(proxy_server, server_tag, outbound)
+            if dns_obj is None:
+                continue
+            if dns_obj not in outbound_dns:
+                outbound_dns.append(dns_obj)
+        if rule.get('type') == 'logical':
+            mode = rule.get('mode')
+            child_rules = rule.get('rules') if isinstance(rule.get('rules'), list) else []
+            if not mode:
+                continue
+            dns_rule_obj = {
+                'type': 'logical',
+                'mode': mode,
+                'rules': [],
+                'server': server_tag
+            }
+            if uses_actions:
+                dns_rule_obj['action'] = 'route'
+            for _rule in child_rules:
+                if not isinstance(_rule, dict):
+                    continue
+                child_rule = pro_dns_from_route_rules(_rule, direct_outbounds)
+                if child_rule:
+                    dns_rule_obj['rules'].append(child_rule)
+            if len(dns_rule_obj['rules']) == 0:
+                dns_rule_obj = None
+        else:
+            dns_rule_obj = pro_dns_from_route_rules(rule, direct_outbounds)
+            if dns_rule_obj is not None:
+                dns_rule_obj['server'] = server_tag
+                if uses_actions and 'action' not in dns_rule_obj:
+                    dns_rule_obj['action'] = 'route'
+        if dns_rule_obj:
+            dns_rules.append(dns_rule_obj)
     _dns_rules = []
     for dr in dns_rules:
         if dr not in _dns_rules:
             _dns_rules.append(dr)
-    config['dns']['rules'] = _dns_rules
-    config['dns']['servers'].extend(outbound_dns)
+    dns['rules'] = _dns_rules
+    dns['servers'].extend(outbound_dns)
+    return True
 
 
-def pro_dns_from_route_rules(route_rule):
+def pro_dns_from_route_rules(route_rule, direct_outbounds=None):
     dns_route_same_list = ["inbound", "ip_version", "network", "protocol", 'domain', 'domain_suffix', 'domain_keyword',
                            'domain_regex', 'geosite', "source_geoip", "source_ip_cidr", "source_port",
                            "source_port_range", "port", "port_range", "process_name", "process_path", "package_name",
                            "user", "user_id", "clash_mode", "invert"]
+    if not isinstance(route_rule, dict):
+        return None
     dns_rule_obj = {}
     for key in route_rule:
         if key in dns_route_same_list:
             dns_rule_obj[key] = route_rule[key]
     if len(dns_rule_obj) == 0:
         return None
-    if route_rule.get('outbound'):
-        dns_rule_obj['server'] = route_rule['outbound'] + '_dns' if route_rule['outbound'] != 'direct' else \
-            providers["auto_set_outbounds_dns"]['direct']
+    outbound = route_rule.get('outbound')
+    asod = providers.get("auto_set_outbounds_dns") if isinstance(providers, dict) else {}
+    direct_tag = asod.get('direct') if isinstance(asod, dict) else None
+    if isinstance(outbound, str) and direct_tag:
+        if outbound == 'direct' or (direct_outbounds and outbound in direct_outbounds):
+            dns_rule_obj['server'] = direct_tag
+        else:
+            dns_rule_obj['server'] = outbound + '_dns'
     return dns_rule_obj
 
 
@@ -507,10 +605,10 @@ def combin_to_config(config, data):
     for group in data:
         temp_outbounds.extend(data[group])
     config['outbounds'] = config_outbounds + temp_outbounds
-    # 自动配置路由规则到dns规则，避免dns泄露
-    dns_tags = [server.get('tag') for server in config['dns']['servers']]
-    asod = providers.get("auto_set_outbounds_dns")
-    if asod and asod.get('proxy') and asod.get('direct') and asod['proxy'] in dns_tags and asod['direct'] in dns_tags:
+    # 自动配置路由规则到dns规则，避免dns泄露。
+    # 1.14 模板的 DNS 服务器没有 address 字段，部分路由规则也没有 outbound，失败时跳过。
+    asod = providers.get("auto_set_outbounds_dns") if isinstance(providers, dict) else None
+    if asod and asod.get('proxy') and asod.get('direct'):
         set_proxy_rule_dns(config)
     # 提取 wireguard 类型内容
     wireguard_items = [item for item in config['outbounds'] if item.get('type') == 'wireguard']
@@ -549,10 +647,10 @@ def select_config_template(tl, selected_template_index=None):
         uip = args.template_index
     else:
         # print ('Nhập số để chọn mẫu cấu hình tương ứng (nhấn Enter để chọn mẫu cấu hình đầu tiên theo mặc định): ')
-        uip = input('输入序号，载入对应config模板（直接回车默认选第一个配置模板）：')
+        uip = input('输入序号，载入对应config模板（直接回车默认选 config_1.14）：')
         try:
             if uip == '':
-                return 0
+                return default_template_index(tl)
             uip = int(uip)
             if uip < 1 or uip > len(tl):
                 print('输入了错误信息！重新输入')

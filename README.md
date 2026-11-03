@@ -13,6 +13,23 @@ https://xxxxxxx.vercel.app/config/https://xxxxxxsubscribe?token=123456&file=http
 https://xxxxxxx.vercel.app/config/https://xxxxxxsubscribe?token=123456&file=2
 ```
 
+### `file=` 序号不会因为新增模板而改号
+
+`file=N` 按固定顺序取值，不再对 `config_template` 做文件名排序，因此加上 `config_1.14.json` 不会把原来的 `file=1` 到 `file=5` 往后挤：
+
+| file= | 模板 |
+| --- | --- |
+| 1 | `config_template_groups_rule_set_tun` |
+| 2 | `config_template_groups_rule_set_tun_fakeip` |
+| 3 | `config_template_no_groups_tun_VN` |
+| 4 | `sb-config-1.12` |
+| 5 | `sb-config-1.14` |
+| 6 | `config_1.14` |
+
+不写 `file=` 时用的是 **`config_1.14`**（sing-box / SFM 1.14 的分组模板），不是 `file=1`。本地执行 `python main.py` 后直接回车也是这个模板。`--template_index` 仍然从 0 开始，`0` 对应 `file=1`。以后新加的模板会排在这 6 个后面。
+
+`file=1` 到 `file=4` 的旧模板已改成 1.14 能启动的 DNS：不再使用已删除的 `"address": "tls://..."`，并去掉 DNS 规则里的 `outbound`、规则集的 `download_detour`、`independent_cache` 和 `store_rdrc`。`sb-config-1.12` 里只含 IP 的 `geoip-cn` DNS 规则改为先 `evaluate` 再用 `match_response`。
+
 本地python执行脚本命令：
 
 ```

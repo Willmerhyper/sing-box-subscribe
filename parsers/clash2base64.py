@@ -270,7 +270,7 @@ def clash2v2ray(share_link):
         auth = share_link.get('password', share_link.get('auth', '')),
         server = share_link['server'],
         port = port,
-        allowInsecure = '0' if share_link.get('skip-cert-verify', '') == False else '1',
+        allowInsecure = '1' if share_link.get('skip-cert-verify') is True or str(share_link.get('skip-cert-verify', '')).strip().lower() in ('1', 'true', 'yes') else '0',
         obfs = share_link.get('obfs', 'none'),
         obfspassword = share_link.get('obfs-password', ''),
         fingerprint = share_link.get('fingerprint', ''),
